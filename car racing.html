@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Realistic Car Racing Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+    canvas { display: block; margin: auto; background: #333; }
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="hud">Speed: 0 | Lap: 1/3</div>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const hud = document.getElementById('hud');
+
+    // Track
+    let track = { width: 400, x: 200, y: 0, length: 5000 };
+
+    // Player Car
+    let player = {
+      x: canvas.width / 2,
+      y: canvas.height - 100,
+      width: 40,
+      height: 70,
+      speed: 0,
+      maxSpeed: 10,
+      acceleration: 0.2,
+      deceleration: 0.1,
+      friction: 0.05,
+      lap: 1,
+      totalLaps: 3
+    };
+
+    // Opponent Cars
+    let opponents = [];
+    for (let i = 0; i < 5; i++) {
+      opponents.push({
+        x: track.x + 50 + Math.random() * (track.width - 100),
+        y: -i * 500,
+        width: 40,
+        height: 70,
+        speed: 4 + Math.random() * 3
+      });
+    }
+
+    // Controls
+    let keys = {};
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup', e => keys[e.key] = false);
+
+    // Tilt control variables
+    let tiltX = 0;
+    window.addEventListener('deviceorientation', function(event) {
+      tiltX = event.gamma; // left/right tilt
+    });
+
+    // Game State
+    let distance = 0;
+    let gameOver = false;
+
+    function update() {
+      if (gameOver) return;
+
+      // Player control (keyboard)
+      if (keys['ArrowUp']) player.speed += player.acceleration;
+      if (keys['ArrowDown']) player.speed -= player.acceleration;
+      if (keys['ArrowLeft']) player.x -= 5;
+      if (keys['ArrowRight']) player.x += 5;
+
+      // Mobile tilt control
+      if (Math.abs(tiltX) > 2) {
+        player.x += tiltX * 0.5; // adjust sensitivity here
+      }
+
+      // Speed limits
+      if (player.speed > player.maxSpeed) player.speed = player.maxSpeed;
+      if (player.speed < 0) player.speed = 0;
+
+      // Friction
+      if (!keys['ArrowUp'] && !keys['ArrowDown']) {
+        if (player.speed > 0) player.speed -= player.friction;
+      }
+
+      // Move track
+      distance += player.speed;
+
+      // Update opponents
+      opponents.forEach(op => {
+        op.y += op.speed;
+        if (op.y > canvas.height + 100) {
+          op.y = -Math.random() * 1000;
+          op.x = track.x + 50 + Math.random() * (track.width - 100);
+        }
+      });
+
+      // Collision detection with opponents
+      opponents.forEach(op => {
+        if (player.x < op.x + op.width &&
+            player.x + player.width > op.x &&
+            player.y < op.y + op.height &&
+            player.y + player.height > op.y) {
+          gameOver = true;
+        }
+      });
+
+      // Lap system
+      if (distance > track.length) {
+        distance = 0;
+        player.lap++;
+        if (player.lap > player.totalLaps) {
+          gameOver = true;
+        }
+      }
+
+      // Boundaries
+      if (player.x < track.x) player.x = track.x;
+      if (player.x + player.width > track.x + track.width) player.x = track.x + track.width - player.width;
+
+      // HUD update
+      hud.innerText = `Speed: ${player.speed.toFixed(1)} | Lap: ${player.lap}/${player.totalLaps}`;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Track
+      ctx.fillStyle = '#555';
+      ctx.fillRect(track.x, 0, track.width, canvas.height);
+
+      // Lane markings
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < canvas.height; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(track.x + track.width / 2, i);
+        ctx.lineTo(track.x + track.width / 2, i + 20);
+        ctx.stroke();
+      }
+
+      // Player car
+      ctx.fillStyle = 'lime';
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Opponents
+      ctx.fillStyle = 'red';
+      opponents.forEach(op => {
+        ctx.fillRect(op.x, op.y, op.width, op.height);
+      });
+
+      // Game Over message
+      if (gameOver) {
+        ctx.fillStyle = 'white';
+        ctx.font = '40px Arial';
+        ctx.fillText(player.lap > player.totalLaps ? 'You Win!' : 'Game Over!', 300, 300);
+      }
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
